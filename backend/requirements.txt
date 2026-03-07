@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+pypdf
+sentence-transformers
+faiss-cpu
+sqlalchemy
