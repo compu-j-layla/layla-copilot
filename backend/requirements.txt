@@ -4,3 +4,5 @@ pypdf
 sentence-transformers
 faiss-cpu
 sqlalchemy
+httpx
+google-genai
