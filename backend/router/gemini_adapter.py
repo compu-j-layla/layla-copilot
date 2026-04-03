@@ -3,7 +3,7 @@ from backend.router.adapter import AdapterResponse
 
 class GeminiAdapter:
     def __init__(self):
-        self.model_name = "gemini-3-flash-preview"
+        self.model_name = "gemini-2.5-flash-lite"
         self.client = genai.Client()
 
     def name(self) -> str:

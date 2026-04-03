@@ -66,7 +66,7 @@ def router_suggest(meeting_id: str, transcript_window: str, no_record_mode: bool
         specific and actionable. The rationale should explain why this action is relevant to the transcript. The confidence
         score should be between 0 and 1, indicating how confident you are in the suggestion.
         
-        If no relevant action can be suggested, return an empty action. Be concise in your response. Base your suggestion
+        If no relevant action can be suggested, return an empty action. Be very concise in your response. Base your suggestion
         only on the provided transcript window and the retrieved context, without making any assumptions about the meeting
         or its participants, or drawing on any external sources of knowledge.
 
