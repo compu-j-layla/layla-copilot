@@ -68,6 +68,14 @@ async def router_suggest(meeting_id: str, no_record_mode: bool, top_k_context: O
         transcript_window_response = await transcript_query_client.post(TRANSCRIPT_QUERY_ENDPOINT, json=transcript_window_request)
         logger.debug("hi")
         truncated_transcript = transcript_window_response.text
+        __lineskips_to_delete = 2
+        __pos = 0
+        while __pos < (len(truncated_transcript) - 1) and __lineskips_to_delete > 0:
+            if(truncated_transcript[__pos]=='\\' and truncated_transcript[__pos+1]=='n'):
+                __lineskips_to_delete -= 1
+                __pos+=1
+            __pos += 1
+        truncated_transcript = truncated_transcript[__pos:-1]
         logger.debug(truncated_transcript)
 
         # TODO: respect no_record_mode privacy constraints
@@ -105,7 +113,7 @@ async def router_suggest(meeting_id: str, no_record_mode: bool, top_k_context: O
         Here is the provided context:
         {rag_context}
         """
-        # logger.debug(prompt)
+        logger.debug(prompt.format(transcript_window=truncated_transcript, rag_context=rag_context))
         llm_response = llm_adapter.generate_response(prompt.format(transcript_window=truncated_transcript, rag_context=rag_context))
 
         end_time = datetime.now()
@@ -137,5 +145,5 @@ async def router_suggest(meeting_id: str, no_record_mode: bool, top_k_context: O
 
 # TODO: change the conditions of checking in RAG (maybe have it be always on?)
 def should_use_rag(transcript_window: str) -> bool:
-    rag_keywords = [ "document", "report", "email", "presentation", "meeting", "deadline", "budget" ]
+    rag_keywords = [ "document", "report", "email", "presentation", "meeting", "deadline", "budget", "context"]
     return any(keyword in transcript_window.lower() for keyword in rag_keywords)

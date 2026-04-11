@@ -47,12 +47,12 @@ export class Suggestion{
 }
 export class RouterSuggestRequest {
     meeting_id: string;
-    transcript_window: string;
+    // transcript_window: string;
     no_record_mode: boolean;
     top_k_context?: number;
-    constructor (meeting_id: string, transcript_window: string, no_record_mode: boolean, top_k_context?: number) {
+    constructor (meeting_id: string, no_record_mode: boolean, top_k_context?: number) {
         this.meeting_id = meeting_id;
-        this.transcript_window = transcript_window;
+        // this.transcript_window = transcript_window;
         this.no_record_mode = no_record_mode;
         this.top_k_context = top_k_context;
     }
@@ -62,5 +62,43 @@ export class RouterSuggestResponse extends ObservabilityMeta {
     constructor(request_id?: string, meeting_id?: string, latency_ms?: number, model_provider?: string, retrieval_hit_count?: number, timestamp?: string, suggestion?: Suggestion){
         super(request_id, meeting_id, latency_ms, model_provider, retrieval_hit_count, timestamp);
         this.suggestion=suggestion;
+    }
+}
+
+// Transcription streaming
+class FileRequest {
+    path: string;
+    meeting_id: string;
+    timestamp: string;
+    constructor(path: string,meeting_id: string,timestamp: string){
+        this.path=path;this.meeting_id=meeting_id;this.timestamp=timestamp;
+    }
+}
+export class TranscriptFile extends FileRequest{
+    constructor(meeting_id: string,timestamp: string,path?: string){
+        if(path !== null && path !== undefined){
+            super(path,meeting_id,timestamp);
+        }
+        else{
+            super("backend/transcript/files/transcript.txt",meeting_id,timestamp);
+        }
+    }
+}
+export class TranscriptSnippet {
+    snippet: string;
+    meeting_id: string;
+    timestamp: string;
+    constructor(snippet: string,meeting_id: string,timestamp: string){
+        this.meeting_id=meeting_id;this.snippet=snippet;this.timestamp=timestamp;
+    }
+}
+
+export class TranscriptRequest {
+    request_id: string;
+    meeting_id: string;
+    timestamp: string;
+    length?: number;
+    constructor(request_id: string,meeting_id: string,timestamp: string,length?: number){
+        this.meeting_id=meeting_id;this.request_id=request_id;this.timestamp=timestamp;this.length=length;
     }
 }
