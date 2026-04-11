@@ -33,7 +33,7 @@ Assumptions and defaults:
 ## 2. System context and component diagram (text/mermaid)
 Context:
 - User speaks during meeting; frontend captures mic (and optional screen context controls).
-- Audio frames stream to backend.
+- Audio frames / transcript stream to backend.
 - Backend manages short in-memory transcript context, performs retrieval and routing, and emits suggestions.
 - Suggestions are rendered on web HUD and forwarded to glasses adapter (Mentra or mock).
 
@@ -58,7 +58,8 @@ flowchart LR
 - Responsibilities:
   - Browser mic capture.
   - Optional screen capture controls.
-  - `AudioFrame` WS uplink.
+  - `AudioFrame` WS uplink. (possibly split into recording mode)
+     - Transcript snippet streaming to API (for processing suggestions / commands)
   - Local speaking/silent trigger state.
 
 2. Frontend HUD module (`frontend/hud/*`)
@@ -99,7 +100,8 @@ flowchart LR
 
 ## 4. Data flow (mic/screen -> backend -> router/RAG -> HUD)
 1. Frontend obtains permissions and opens WS session.
-2. Frontend streams `AudioFrame` messages to `WS /api/v1/stream/audio`.
+2. Frontend streams `TranscriptSnippet`s to `/api/v1/stream/transcript/update`.
+   - Possibly also streams `AudioFrame` messages to `WS /api/v1/stream/audio`(recording mode / later adaptation in `v2`)
 3. Realtime engine validates frames and appends decoded content to bounded in-memory transcript buffer.
 4. Router builds `RouterSuggestRequest` from transcript window and privacy flags.
 5. Router calls RAG query path (`POST /api/v1/rag/query`) for contextual snippets.
