@@ -30,15 +30,15 @@ export class Citation {
 }
 export class Suggestion{
     suggestion_id: string;
-    action: string;
+    response: string;
     rationale: string;
     confidence: number;
     citations: Citation[];
     latency_ms: number;
-    constructor (suggestion_id: string,action: string,rationale: string,confidence: number,citations: Citation[],latency_ms: number){
+    constructor (suggestion_id: string,response: string,rationale: string,confidence: number,citations: Citation[],latency_ms: number){
         assert(confidence>=0.0&&confidence<=1.0);
         this.suggestion_id=suggestion_id;
-        this.action=action;
+        this.response=response;
         this.rationale=rationale;
         this.confidence=confidence;
         this.citations=citations;

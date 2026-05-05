@@ -70,7 +70,7 @@ class LaylaCopilotApp extends AppServer {
         await streamTranscript(sessionId,data.text);
         let query = await getSuggestion(sessionId,this.NO_RECORD_MODE,this.top_k_context);
         console.log(query);
-        session.layouts.showTextWall("Transcript: "+data.text+"\nSuggestion: "+query!.suggestion!.action);
+        session.layouts.showTextWall("Transcript: "+data.text+"\nSuggestion: "+query!.suggestion!.response);
 
       }
     })

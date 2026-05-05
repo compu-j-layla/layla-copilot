@@ -12,17 +12,20 @@ import logging
 from backend.transcript.types import *
 
 TRANSCRIPT_WINDOWS_TRUNCATE_LENGTH = 1000
+TRANSCRIPT_WINDOWS_SHORTEST_LENGTH = 100
 RAG_BASE_URL = "http://localhost:8000"
 RAG_QUERY_ENDPOINT = "/api/v1/rag/query"
 RAG_TRANSCRIPT_WINDOW_SLICE = 300
 RAG_DEFAULT_TOP_K = 5
+
+DEMO_MODE = True
 
 TRANSCRIPT_BASE_URL = "http://localhost:8000" # TO-DO: host the API non-locally
 TRANSCRIPT_QUERY_ENDPOINT = "/api/v1/transcript/"
 
 class Suggestion(BaseModel):
     suggestion_id: str
-    action: str
+    response: str
     rationale: str
     confidence: float = Field(ge=0, le=1)
     citations: list[Citation]
@@ -66,7 +69,6 @@ async def router_suggest(meeting_id: str, no_record_mode: bool, top_k_context: O
             'length': TRANSCRIPT_WINDOWS_TRUNCATE_LENGTH
         }
         transcript_window_response = await transcript_query_client.post(TRANSCRIPT_QUERY_ENDPOINT, json=transcript_window_request)
-        logger.debug("hi")
         truncated_transcript = transcript_window_response.text
         __lineskips_to_delete = 2
         __pos = 0
@@ -77,6 +79,27 @@ async def router_suggest(meeting_id: str, no_record_mode: bool, top_k_context: O
             __pos += 1
         truncated_transcript = truncated_transcript[__pos:-1]
         logger.debug(truncated_transcript)
+
+        if len(truncated_transcript.split()) < TRANSCRIPT_WINDOWS_SHORTEST_LENGTH:
+            # context is too short, wait until more context is given
+            end_time = datetime.now()
+            latency_ms = int((end_time - start_time).total_seconds() * 1000)
+            return RouterSuggestResponse(
+                request_id=request_id,
+                meeting_id=meeting_id,
+                latency_ms=latency_ms,
+                model_provider=llm_adapter.name(),
+                retrieval_hit_count=0,
+                timestamp=end_time.isoformat(),
+                suggestion=Suggestion(
+                    suggestion_id=suggestion_id,
+                    response="awaiting more context.",
+                    rationale="meeting has not progressed enough for a response",
+                    confidence="1.0",
+                    citations=[],
+                    latency_ms=latency_ms,
+                )
+            )
 
         # TODO: respect no_record_mode privacy constraints
 
@@ -90,7 +113,13 @@ async def router_suggest(meeting_id: str, no_record_mode: bool, top_k_context: O
             }
             rag_query = await rag_query_client.post(RAG_QUERY_ENDPOINT, json=rag_query_request)
             
-            rag_context = rag_query.text
+            rag_context_list = rag_query.json()
+            rag_context = ""
+            
+            for snippet in rag_context_list:
+                rag_context += "- snippet: <begin>" + snippet["text"] + "<end>"
+                rag_context += "\n"
+            logger.debug(type(rag_context))
             logger.debug(rag_context)
 
         # FIXME: Parse RAG context into chunks of text instead of a json format array straight from the response
@@ -99,7 +128,7 @@ async def router_suggest(meeting_id: str, no_record_mode: bool, top_k_context: O
         You are an AI copilot assistant for meetings. Based on the following transcript window and retrieved context,
         provide information or suggestions that may be relevant, along with a rationale and confidence score. The response should be concise, in 15 words and specific. The rationale should explain why the returned information / suggestions are relevant to the transcript. The confidence score should be between 0 and 1, indicating how confident you are in the suggestion.
         
-        If no relevant action can be suggested, recap the provided context in 15 words. Be very concise in your response, keeping it within 15 words. Base your suggestion
+        If no relevant information or suggestion can be given, recap the provided context in 15 words. Be very concise in your response, keeping it within 15 words. Base your suggestion
         only on the provided transcript window and the retrieved context, without making any assumptions about the meeting
         or its participants, or drawing on any external sources of knowledge.
 
@@ -110,7 +139,7 @@ async def router_suggest(meeting_id: str, no_record_mode: bool, top_k_context: O
         Here is the transcript window:
         {transcript_window}
 
-        Here is the provided context:
+        Here is a list of possible relevant snippets:
         {rag_context}
         """
         logger.debug(prompt.format(transcript_window=truncated_transcript, rag_context=rag_context))
@@ -121,7 +150,7 @@ async def router_suggest(meeting_id: str, no_record_mode: bool, top_k_context: O
         
         suggestion = Suggestion(
             suggestion_id=suggestion_id,
-            action=llm_response.action,
+            response=llm_response.response,
             rationale=llm_response.rationale,
             confidence=llm_response.confidence,
             citations=llm_response.citations,
@@ -146,4 +175,4 @@ async def router_suggest(meeting_id: str, no_record_mode: bool, top_k_context: O
 # TODO: change the conditions of checking in RAG (maybe have it be always on?)
 def should_use_rag(transcript_window: str) -> bool:
     rag_keywords = [ "document", "report", "email", "presentation", "meeting", "deadline", "budget", "context"]
-    return any(keyword in transcript_window.lower() for keyword in rag_keywords)
+    return DEMO_MODE or any(keyword in transcript_window.lower() for keyword in rag_keywords)

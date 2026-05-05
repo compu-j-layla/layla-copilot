@@ -224,7 +224,7 @@ type RouterSuggestRequest = {
 
 type Suggestion = {
   suggestion_id: string; // stable/idempotent for same inference output
-  action: string; // e.g. "clarify budget"
+  response: string; // e.g. "clarify budget"
   rationale: string;
   confidence: number; // 0..1
   citations: Citation[];
