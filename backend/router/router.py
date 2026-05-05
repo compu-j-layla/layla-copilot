@@ -11,8 +11,9 @@ import asyncio
 import logging
 from backend.transcript.types import *
 
-TRANSCRIPT_WINDOWS_TRUNCATE_LENGTH = 1000
-TRANSCRIPT_WINDOWS_SHORTEST_LENGTH = 100
+TRANSCRIPT_TRUNCATE_LENGTH = 1000
+TRANSCRIPT_WINDOWS_TRUNCATE_LENGTH = 30
+TRANSCRIPT_WINDOWS_SHORTEST_LENGTH = 20
 RAG_BASE_URL = "http://localhost:8000"
 RAG_QUERY_ENDPOINT = "/api/v1/rag/query"
 RAG_TRANSCRIPT_WINDOW_SLICE = 300
@@ -66,7 +67,7 @@ async def router_suggest(meeting_id: str, no_record_mode: bool, top_k_context: O
             'meeting_id': meeting_id,
             'request_id': request_id,
             'timestamp': str(start_time),
-            'length': TRANSCRIPT_WINDOWS_TRUNCATE_LENGTH
+            'length': TRANSCRIPT_TRUNCATE_LENGTH
         }
         transcript_window_response = await transcript_query_client.post(TRANSCRIPT_QUERY_ENDPOINT, json=transcript_window_request)
         truncated_transcript = transcript_window_response.text
@@ -103,7 +104,7 @@ async def router_suggest(meeting_id: str, no_record_mode: bool, top_k_context: O
 
         # TODO: respect no_record_mode privacy constraints
 
-        # truncated_transcript = transcript_window[-TRANSCRIPT_WINDOWS_TRUNCATE_LENGTH:]
+        transcript_window = " ".join((truncated_transcript.split()[-TRANSCRIPT_WINDOWS_TRUNCATE_LENGTH:]))
         rag_context = ""
         if should_use_rag(truncated_transcript):
             rag_query_request = {
@@ -125,7 +126,7 @@ async def router_suggest(meeting_id: str, no_record_mode: bool, top_k_context: O
         # FIXME: Parse RAG context into chunks of text instead of a json format array straight from the response
         # FIXME: Adapt the prompt for word limits / to produce actually useful results
         prompt = """
-        You are an AI copilot assistant for meetings. Based on the following transcript window and retrieved context,
+        You are an AI copilot assistant for meetings. Based on the following transcript window, the full transcript, and retrieved context,
         provide information or suggestions that may be relevant, along with a rationale and confidence score. The response should be concise, in 15 words and specific. The rationale should explain why the returned information / suggestions are relevant to the transcript. The confidence score should be between 0 and 1, indicating how confident you are in the suggestion.
         
         If no relevant information or suggestion can be given, recap the provided context in 15 words. Be very concise in your response, keeping it within 15 words. Base your suggestion
@@ -139,11 +140,15 @@ async def router_suggest(meeting_id: str, no_record_mode: bool, top_k_context: O
         Here is the transcript window:
         {transcript_window}
 
+        Here is the full transcript:
+        {full_transcript}
+
         Here is a list of possible relevant snippets:
         {rag_context}
         """
-        logger.debug(prompt.format(transcript_window=truncated_transcript, rag_context=rag_context))
-        llm_response = llm_adapter.generate_response(prompt.format(transcript_window=truncated_transcript, rag_context=rag_context))
+        formatted_prompt = prompt.format(transcript_window=transcript_window,full_transcript=truncated_transcript, rag_context=rag_context)
+        logger.debug(formatted_prompt)
+        llm_response = llm_adapter.generate_response(formatted_prompt)
 
         end_time = datetime.now()
         latency_ms = int((end_time - start_time).total_seconds() * 1000)
