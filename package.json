@@ -1,18 +1,17 @@
-
 {
   "name": "compu-j-layla-copilot.frontend",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "start": "bun src/index.ts",
-    "dev": "bun --hot src/index.ts",
+    "start": "bun frontend/src/index.ts",
+    "dev": "bun --hot frontend/src/index.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "@mentra/sdk": "latest",
+    "@mentra/sdk": "^2.1.29",
     "express": "^4.21.2",
     "ws": "^8.18.1"
   },

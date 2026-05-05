@@ -5,7 +5,7 @@
     "": {
       "name": "compu-j-layla-copilot.frontend",
       "dependencies": {
-        "@mentra/sdk": "latest",
+        "@mentra/sdk": "^2.1.29",
         "express": "^4.21.2",
         "ws": "^8.18.1",
       },
