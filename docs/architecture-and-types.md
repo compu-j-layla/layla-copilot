@@ -2,7 +2,21 @@
 
 Status: Proposed for team sign-off  
 Version: `v1.0.0`  
-Canonical path: `/Users/michael/Documents/University/group-project/layla-copilot/docs/architecture-and-types.md`
+Canonical path: `layla-copilot/docs/architecture-and-types.md`
+
+### Table of Contents
+- [Purpose and Scope](#1-purpose-and-scope)
+- [System Context and Component Diagram](#2-system-context-and-component-diagram-textmermaid)
+- [Module Boundaries and Ownership](#3-module-boundaries-and-ownership-by-team-member)
+- [Data Flow](#4-data-flow-micscreen---backend---routerrag---hud)
+- [API contract (HTTP/WS/SSE)](#5-api-contract-httpwssse)
+- [Types and Definitions Scheme](#6-shared-type-definitions-canonical-field-level-schema)
+- [Error Handling and Retry Semantics](#7-error-handling-and-retry-semantics)
+- [Privacy and Security Constraints](#8-privacy-and-security-constraints)
+- [Performance and Latency Budget](#9-performance-and-latency-budget-breakdown)
+- [Versioning and Compatibility Rules](#10-versioning-and-compatibility-rules)
+- [Test and Acceptance Matrix](#11-test-and-acceptance-matrix)
+- [Change Management Process](#12-change-management-process)
 
 ## 1. Purpose and scope
 This document is the team-wide technical contract for the Layla Smart Glasses Copilot. It defines:
@@ -99,16 +113,23 @@ flowchart LR
   - Progress and final handoff documentation.
 
 ## 4. Data flow (mic/screen -> backend -> router/RAG -> HUD)
-1. Frontend obtains permissions and opens WS session.
-2. Frontend streams `TranscriptSnippet`s to `/api/v1/stream/transcript/update`.
+For the app to run, a process for hosting the backend (currently local, defaulted to `localhost:8000`) and a process for hosting the webhook / websocket (currently local, defaulted to `localhost:3000`) are needed. The app can then be started (currently with `bun run start` or `bun run dev`) and the corresponding mobile app should be opened on the MentraOS app.
+1. Frontend obtains permissions and opens WS session. A transcript log and a response log are initialised in the backend (which may be deleted per privacy settings).
+2. Frontend transcribes a snippet on detecting speech. Once a snippet is over, it streams `TranscriptSnippet`s to `/api/v1/stream/transcript/update`, calling a request (`POST /api/v1/suggest`) for a suggestion.
    - Possibly also streams `AudioFrame` messages to `WS /api/v1/stream/audio`(recording mode / later adaptation in `v2`)
-3. Realtime engine validates frames and appends decoded content to bounded in-memory transcript buffer.
-4. Router builds `RouterSuggestRequest` from transcript window and privacy flags.
-5. Router calls RAG query path (`POST /api/v1/rag/query`) for contextual snippets.
-6. Router composes prompt with transcript + retrieved snippets + meeting metadata.
-7. Router gets model output from provider adapter and maps it to `Suggestion`.
-8. Suggestion is emitted as `SuggestionEvent` over SSE and optionally forwarded to Mentra/mock adapter.
-9. Frontend HUD renders suggestion; deduplicates by `suggestion_id`.
+   - Real-time engine (API) takes care of the calls, forwards the snippet to the transcript file to another script for logging and forwards the request to the server
+3. Router builds `RouterSuggestRequest` from transcript window and privacy flags.
+4. Router calls RAG query path (`POST /api/v1/rag/query`) for contextual snippets.
+5. Router composes prompt with transcript + retrieved snippets + meeting metadata.
+6. Router gets model output from provider adapter and maps it to `Suggestion`.
+7. Suggestion is combined with metadata and emitted as `RouterSuggestResponse` over SSE and forwarded to the frontend.
+  - The suggestion and metadata is also emitted as a `LoggedResponse` over SSE and calls `POST /api/v1/responses`, forwarding the object to the real-time engine.
+  - The engine takes care of the call and forwards it to the script for the response log.
+8. Frontend HUD renders suggestion as two lines:
+   ```
+   Transcript: [latest snippet]
+   Suggestion: [suggestion]
+   ```
 
 ## 5. API contract (HTTP/WS/SSE)
 
@@ -136,17 +157,40 @@ flowchart LR
 - Success response: `RouterSuggestResponse` (`200`)
 - Errors: `ErrorEnvelope` (`400`, `422`, `500`, `503`)
 
+4. `/api/v1/transcript/`
+- Purpose: support all transcript-related events
+   1.1. `POST /api/v1/transcript/init`
+   - Purpose: initialise transcript file
+   - Request: `TranscriptFile`
+   - Success respnonse: `{"transcript file": filepath}` (`201`)
+   - Errors: `ErrorEnvelope` (`400`, `422`, `500`)
+   1.2. `POST /api/v1/transcript/update`
+   - Purpose: stream snippet into transcript buffer
+   - Request: `TranscriptSnippet`
+   - Success respnonse: `{"transcript file": filepath}` (`200`)
+   - Errors: `ErrorEnvelope` (`400`, `422`, `500`)
+   1.3. `DELETE /api/v1/transcript`
+   - Purpose: delete transcript buffer / file
+   - Request: /
+   - Success response: (`200`)
+   - Errors: `ErrorEnvelope` (`400`, `422`, `500`)
+
 ### 5.3 Realtime endpoints (normative)
-1. `WS /api/v1/stream/audio`
+1. `POST /api/v1/transcript/` (SSE)
+- Purpose: retrieve the most recent transcript window given a window length
+- Event type: string
+- Payload type: `TranscriptRequest`
+
+- (unused) `POST /api/v1/suggestions/{meeting_id}` (SSE)
+- Event type: `suggestion`
+- Payload type: `SuggestionEvent`
+- Reconnect support: `Last-Event-ID` and event `id`.
+
+- (to-be-completed) `POST /api/v1/stream/audio` 
 - Client -> server message: `AudioFrame`.
 - Server -> client control messages:
   - `audio_ack`
   - `audio_nack` (includes structured error)
-
-2. `GET /api/v1/suggestions/{meeting_id}` (SSE)
-- Event type: `suggestion`
-- Payload type: `SuggestionEvent`
-- Reconnect support: `Last-Event-ID` and event `id`.
 
 ## 6. Shared type definitions (canonical field-level schema)
 Source-of-truth model names are backend Pydantic models; TypeScript types are generated from OpenAPI.
@@ -162,6 +206,12 @@ type ObservabilityMeta = {
   model_provider: string;
   retrieval_hit_count: number;
   timestamp: ISO8601;
+};
+
+type FileRequest = {
+    path: string;
+    meeting_id: string;
+    timestamp: string;
 };
 ```
 
@@ -217,7 +267,6 @@ type RagQueryResponse = ObservabilityMeta & {
 ```ts
 type RouterSuggestRequest = {
   meeting_id: string;
-  transcript_window: string; // in-memory derived, never persisted
   no_record_mode: boolean;
   top_k_context?: number; // default 5
 };
@@ -242,7 +291,49 @@ type SuggestionEvent = ObservabilityMeta & {
 };
 ```
 
-### 6.4 Realtime audio message types
+### 6.4 Realtime transcript types
+```ts
+type TranscriptFile = FileRequest & { };
+
+type TranscriptSnippet = {
+    snippet: string;
+    meeting_id: string;
+    timestamp: string;
+};
+
+type TranscriptRequest = {
+    request_id: string;
+    meeting_id: string;
+    timestamp: string;
+    length?: number;
+};
+```
+
+### 6.5 Response log types
+```ts
+type ResponseFile = FileRequest & { };
+
+type LoggedResponse = RouterSuggestResponse & {
+    transcript_window: string;
+};
+```
+
+### 6.6 Standard error envelope
+```ts
+type ErrorBody = {
+  code: string;
+  message: string;
+  details?: Record<string, unknown>;
+};
+
+type ErrorEnvelope = {
+  error: ErrorBody;
+  request_id: string;
+  timestamp: ISO8601;
+};
+```
+
+### 6.7 (Unused) Realtime audio message types
 ```ts
 type AudioFrame = {
   type: "audio_frame";
@@ -273,22 +364,6 @@ type AudioNack = {
   timestamp: ISO8601;
 };
 ```
-
-### 6.5 Standard error envelope
-```ts
-type ErrorBody = {
-  code: string;
-  message: string;
-  details?: Record<string, unknown>;
-};
-
-type ErrorEnvelope = {
-  error: ErrorBody;
-  request_id: string;
-  timestamp: ISO8601;
-};
-```
-
 ## 7. Error handling and retry semantics
 HTTP:
 - `400`: malformed request; client must fix payload.
@@ -297,12 +372,12 @@ HTTP:
 - `500`: internal error.
 - `503`: provider unavailable; retry allowed with backoff.
 
-WS (`/stream/audio`):
+(unused) WS (`/stream/audio`):
 - Invalid `AudioFrame` -> send `audio_nack`; do not terminate session for first offense.
 - Repeated invalid frames (>=3 consecutive) -> server may close with policy code.
 - Client retries by resending next valid frame; no server replay.
 
-SSE (`/suggestions/{meeting_id}`):
+(unused) SSE (`/suggestions/{meeting_id}`):
 - Server emits `id` for each `SuggestionEvent`.
 - Client must reconnect with `Last-Event-ID`.
 - Frontend must dedupe by `suggestion.suggestion_id`.
@@ -314,22 +389,19 @@ Idempotency:
 
 ## 8. Privacy and security constraints
 1. Transcript storage policy:
-- Transcript content lives in memory only (ring buffer capped at 90 seconds).
-- Transcript must never be persisted to filesystem or durable DB.
+- Transcript content lives during meeting.
+- Transcript and response log will not persist after if `no_record_mode` is on.
+- Transcript and response log never stored on cloud, only locally (or not at all after the meeting).
 
-2. Logging policy:
-- No raw transcript tokens/strings in logs.
-- Log only aggregate counters and timing metadata.
-
-3. `no_record_mode` behavior:
+2. `no_record_mode` behavior:
 - Must be present in `RouterSuggestRequest`.
-- When `true`, transcript retention must be minimized to active processing window only.
+- When `true`, transcript retention must be minimized to active processing window only; transcript logs will be deleted after the meeting; response log will not be generated.
 
-4. Secrets and credentials:
+3. Secrets and credentials:
 - Provider keys in environment variables only.
 - Never committed to repository.
 
-5. Data handling:
+4. Data handling:
 - RAG indexed corpora may be persisted (documents/chunks/embeddings metadata).
 - Any user conversational content is non-persistent by default in v1.
 
