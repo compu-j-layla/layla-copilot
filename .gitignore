@@ -18,3 +18,4 @@ __pycache__/
 
 # Transcript files
 backend/transcript/files/*
+backend/responses/files/*

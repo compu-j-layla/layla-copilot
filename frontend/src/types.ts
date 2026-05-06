@@ -102,3 +102,23 @@ export class TranscriptRequest {
         this.meeting_id=meeting_id;this.request_id=request_id;this.timestamp=timestamp;this.length=length;
     }
 }
+
+// Response log
+export class ResponseFile extends FileRequest{
+    constructor(meeting_id: string,timestamp: string,path?: string){
+        if(path !== null && path !== undefined){
+            super(path,meeting_id,timestamp);
+        }
+        else{
+            super("backend/responses/files/log.txt",meeting_id,timestamp);
+        }
+    }
+}
+export class LoggedResponse extends RouterSuggestResponse {
+    transcript_window: string;
+    constructor(transcript_window: string, request_id?: string, meeting_id?: string, latency_ms?: number, model_provider?: string, retrieval_hit_count?: number, timestamp?: string, suggestion?: Suggestion){
+        super(request_id, meeting_id, latency_ms, model_provider, retrieval_hit_count, timestamp);
+        this.suggestion=suggestion;
+        this.transcript_window=transcript_window;
+    }
+}

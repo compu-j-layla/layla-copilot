@@ -1,5 +1,5 @@
 import { AppServer, AppSession, ViewType } from '@mentra/sdk';
-import {RouterSuggestRequest, RouterSuggestResponse, Suggestion, TranscriptFile, TranscriptRequest, TranscriptSnippet} from './types.ts';
+import {RouterSuggestRequest, RouterSuggestResponse, Suggestion, TranscriptFile, TranscriptRequest, TranscriptSnippet, ResponseFile, LoggedResponse} from './types.ts';
 
 const PACKAGE_NAME = process.env.PACKAGE_NAME ?? (() => { throw new Error('PACKAGE_NAME is not set in .env file'); })();
 const MENTRAOS_API_KEY = process.env.MENTRAOS_API_KEY ?? (() => { throw new Error('MENTRAOS_API_KEY is not set in .env file'); })();
@@ -7,6 +7,7 @@ const PORT = parseInt(process.env.PORT || '3000');
 const API_URL = "http://localhost:8000";
 
 const TRANSCRIPT_FILE_PATH = undefined;
+const RESPONSE_LOG_PATH = undefined;
 
 async function initTranscriptFile(meeting_id: string, path?: string): Promise<Object>{
   const headers: Headers = new Headers();
@@ -44,6 +45,19 @@ async function getSuggestion(meeting_id: string, no_record_mode: boolean, top_k_
   return query_res;
 }
 
+async function initResponseLog(meeting_id: string, path?: string): Promise<Object>{
+  const headers: Headers = new Headers();
+  headers.append("Content-Type", "application/json");
+  let body: BodyInit = JSON.stringify(new ResponseFile(meeting_id, new Date().toLocaleTimeString(),path));
+  const api_query: RequestInfo = new Request(API_URL+'/api/v1/responses/init', {method: 'POST',headers: headers,body: body});
+  let res = await fetch(api_query); return await res.json();
+}
+
+async function deleteResponseLog(): Promise<void>{
+  const api_query: RequestInfo = new Request(API_URL+'/api/v1/responses/', {method: 'DELETE'});
+  await fetch(api_query);
+}
+
 class LaylaCopilotApp extends AppServer {
   NO_RECORD_MODE: boolean;
   top_k_context?: number;
@@ -63,6 +77,9 @@ class LaylaCopilotApp extends AppServer {
     await initTranscriptFile(sessionId, TRANSCRIPT_FILE_PATH);
     // Handle real-time transcription
     // requires microphone permission to be set in the developer console
+
+    await initResponseLog(sessionId, RESPONSE_LOG_PATH);
+    // Logging of responses and the corresponding transcript window
 
     session.events.onTranscription(async (data) => {
       if (data.isFinal) {
@@ -86,6 +103,7 @@ class LaylaCopilotApp extends AppServer {
   protected async onStop(sessionId: string, userId: string, reason: string): Promise<void> {
     if(this.NO_RECORD_MODE){
       await deleteTranscript();
+      await deleteResponseLog();
     }
   }
 }
