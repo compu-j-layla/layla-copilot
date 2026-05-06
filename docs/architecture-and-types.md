@@ -1,7 +1,7 @@
 # Layla Copilot Architecture and Types Contract (v1)
 
 Status: Proposed for team sign-off  
-Version: `v1.0.0`  
+Version: `v2.0.0`  
 Canonical path: `layla-copilot/docs/architecture-and-types.md`
 
 ### Table of Contents
