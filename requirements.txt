@@ -1,4 +1,4 @@
-faiss
+faiss-cpu
 fastapi==0.136.1
 httpx==0.28.1
 numpy==2.4.4

@@ -10,7 +10,7 @@ authors = [
 requires-python = ">=3.12"
 readme = "README.md"
 description = "Low-latency meeting copilot for smart glasses running MentraOS"
-dependencies = ["faiss",
+dependencies = ["faiss-cpu",
 "fastapi==0.136.1",
 "httpx==0.28.1",
 "numpy==2.4.4",
