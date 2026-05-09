@@ -5,7 +5,6 @@ COPY requirements.txt ./
 RUN python3 -m venv myvenv/
 RUN myvenv/bin/pip3 install --no-cache-dir --upgrade pip \
   && myvenv/bin/pip3 install --no-cache-dir -r requirements.txt
-RUN curl -fsSL https://bun.sh/install | bash && ln -s $HOME/.bun/bin/bun /usr/local/bin/bun
 COPY run.sh run.sh
 RUN ["chmod", "+x", "run.sh"]
 CMD ./run.sh
