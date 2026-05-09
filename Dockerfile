@@ -9,6 +9,6 @@ RUN pip install --no-cache-dir --upgrade pip \
   && pip install --no-cache-dir -r requirements.txt
 COPY . .
 FROM ubuntu:latest
-RUN ["chmod", "+x", "/run.sh"]
 COPY run.sh run.sh
+RUN ["chmod", "+x", "run.sh"]
 CMD ./run.sh
