@@ -1,6 +1,6 @@
 FROM ubuntu:latest
 RUN apt-get update
-RUN apt-get install curl
+RUN apt-get install -y curl
 RUN apt-get install -y --reinstall python3-dev python3-pip python3.14-venv python3-full
 COPY requirements.txt ./
 RUN python3 -m venv myvenv/
