@@ -1,14 +1,11 @@
-FROM oven/bun:1-alpine
-WORKDIR /app
-COPY package.json bun.lockb ./
-RUN bun install --frozen-lockfile
-COPY . ./
-FROM python:3
-COPY requirements.txt ./
-RUN pip install --no-cache-dir --upgrade pip \
-  && pip install --no-cache-dir -r requirements.txt
-COPY . .
 FROM ubuntu:latest
+RUN apt-get update
+RUN apt-get install -y --reinstall python3-dev python3-pip python3.14-venv python3-full
+COPY requirements.txt ./
+RUN python3 -m venv myvenv/
+RUN myvenv/bin/pip3 install --no-cache-dir --upgrade pip \
+  && myvenv/bin/pip3 install --no-cache-dir -r requirements.txt
+RUN curl -fsSL https://bun.sh/install | bash && ln -s $HOME/.bun/bin/bun /usr/local/bin/bun
 COPY run.sh run.sh
 RUN ["chmod", "+x", "run.sh"]
 CMD ./run.sh
