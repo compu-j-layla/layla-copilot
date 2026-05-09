@@ -1,7 +1,7 @@
 {
   "name": "compu-j-layla-copilot.frontend",
-  "version": "1.0.0",
-  "main": "index.js",
+  "version": "1.1.0",
+  "main": "frontend/src/index.js",
   "scripts": {
     "start": "bun frontend/src/index.ts",
     "dev": "bun --hot frontend/src/index.ts",
